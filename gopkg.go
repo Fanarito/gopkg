@@ -6,8 +6,10 @@
 package gopkg
 
 import (
+	"errors"
 	"html/template"
 	"net/http"
+	"regexp"
 
 	"github.com/caddyserver/caddy"
 	"github.com/caddyserver/caddy/caddyhttp/httpserver"
@@ -21,6 +23,13 @@ func init() {
 }
 
 type Config struct {
+	Path string
+	Vcs  string
+	Uri  string
+}
+
+type templateVars struct {
+	Host string
 	Path string
 	Vcs  string
 	Uri  string
@@ -43,41 +52,51 @@ go get {{.Host}}{{.Path}}
 `))
 
 func (g GopkgHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
-	for i := range g.Configs {
+	vars, err := handleGoPkg(g.Configs, r.Host, r.URL.Path)
+	if err != nil {
+		return g.Next.ServeHTTP(w, r)
+	}
 
-		// Check if the request path should be handled by Gopkg middleware
-		if !httpserver.Path(r.URL.Path).Matches(g.Configs[i].Path) {
+	// Check if the request path contains go-get=1
+	if r.FormValue("go-get") != "1" {
+		http.Redirect(w, r, vars.Uri, http.StatusTemporaryRedirect)
+		return 0, nil
+	}
+
+	err = tmpl.Execute(w, vars)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	return http.StatusOK, nil
+}
+
+func handleGoPkg(configs []Config, host string, path string) (templateVars, error) {
+	for _, cfg := range configs {
+		vars, err := cfg.constructTemplateVariables(host, path)
+		if err != nil {
 			continue
 		}
 
-		cfg := &g.Configs[i]
-
-		// Check if the request path contains go-get=1
-		if r.FormValue("go-get") != "1" {
-			http.Redirect(w, r, cfg.Uri, http.StatusTemporaryRedirect)
-			return 0, nil
-		}
-
-		host := r.Host
-
-		err := tmpl.Execute(w, struct {
-			Host string
-			Path string
-			Vcs  string
-			Uri  string
-		}{
-			Host: host,
-			Path: cfg.Path,
-			Vcs:  cfg.Vcs,
-			Uri:  cfg.Uri,
-		})
-		if err != nil {
-			return http.StatusInternalServerError, err
-		}
-		return http.StatusOK, nil
+		return vars, nil
 	}
 
-	return g.Next.ServeHTTP(w, r)
+	return templateVars{}, errors.New("no matching config")
+}
+
+func (c Config) constructTemplateVariables(host string, path string) (templateVars, error) {
+	rExp, err := regexp.Compile(c.Path)
+	if err != nil || !rExp.MatchString(path) {
+		return templateVars{}, errors.New("no regex match")
+	}
+
+	uri := rExp.ReplaceAllString(path, c.Uri)
+
+	return templateVars{
+		Host: host,
+		Path: path,
+		Vcs:  c.Vcs,
+		Uri:  uri,
+	}, nil
 }
 
 func setup(c *caddy.Controller) error {
