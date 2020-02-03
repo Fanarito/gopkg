@@ -34,6 +34,7 @@ type GopkgHandler struct {
 var tmpl = template.Must(template.New("").Parse(`<html>
 <head>
 <meta name="go-import" content="{{.Host}}{{.Path}} {{.Vcs}} {{.Uri}}">
+<meta name="go-source" content="{{.Host}}{{.Path}} {{.Uri}} {{.Uri}}/tree/master{/dir} {{.Uri}}/blob/master{/dir}/{file}#L{line}" />
 </head>
 <body>
 go get {{.Host}}{{.Path}}
