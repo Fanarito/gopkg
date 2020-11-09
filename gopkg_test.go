@@ -68,11 +68,11 @@ func TestGopkgConfig(t *testing.T) {
 		},
 		// Regex
 		{
-			`gopkg /github/([\w\-\.]+)/([\w\-]+) https://github.com/$1/$2`,
+			`gopkg /github/$1/$2 https://github.com/$1/$2`,
 			false,
 			[]Config{
 				{
-					Path: `/github/([\w\-\.]+)/([\w\-]+)`,
+					Path: `/github/$1/$2`,
 					Vcs:  "git",
 					Uri:  `https://github.com/$1/$2`,
 				},
@@ -94,18 +94,18 @@ func TestGopkgConfig(t *testing.T) {
 		// GitLab subgroup + no subgroup regex
 		{
 			`
-			gopkg /([\w\-\.]+)/([\w\-]+) https://gitlab.com/exampleorg/$1/$2
-			gopkg /([\w\-]+) https://gitlab.com/exampleorg/$1
+			gopkg /$1/$2 https://gitlab.com/exampleorg/$1/$2
+			gopkg /$1 https://gitlab.com/exampleorg/$1
 			`,
 			false,
 			[]Config{
 				{
-					Path: `/([\w\-\.]+)/([\w\-]+)`,
+					Path: `/$1/$2`,
 					Vcs:  "git",
 					Uri:  `https://gitlab.com/exampleorg/$1/$2`,
 				},
 				{
-					Path: `/([\w\-]+)`,
+					Path: `/$1`,
 					Vcs:  "git",
 					Uri:  `https://gitlab.com/exampleorg/$1`,
 				},
@@ -131,6 +131,31 @@ func TestGopkgConfig(t *testing.T) {
 						Path: "/api",
 						Vcs:  "git",
 						Uri:  "https://gitlab.com/exampleorg/api",
+					},
+				},
+			},
+		},
+		// Subpackages get the modules url
+		{
+			`gopkg /github/$1/$2 https://github.com/$1/$2`,
+			false,
+			[]Config{
+				{
+					Path: `/github/$1/$2`,
+					Vcs:  "git",
+					Uri:  `https://github.com/$1/$2`,
+				},
+			},
+			[]io{
+				{
+					"example.com",
+					"/github/xxx/yyy/zzz",
+					false,
+					templateVars{
+						Host: "example.com",
+						Path: "/github/xxx/yyy",
+						Vcs:  "git",
+						Uri:  "https://github.com/xxx/yyy",
 					},
 				},
 			},
@@ -176,7 +201,7 @@ func TestGopkgConfig(t *testing.T) {
 		}
 
 		for _, io := range test.io {
-			vars, err := handleGoPkg(test.expect, io.host, io.path)
+			vars, err := handleGoPkg(actual, io.host, io.path)
 			if err != nil && !io.wantErr {
 				t.Errorf("Got error when no error was expected: %v", err)
 			} else if err == nil && io.wantErr {

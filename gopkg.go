@@ -23,9 +23,10 @@ func init() {
 }
 
 type Config struct {
-	Path string
-	Vcs  string
-	Uri  string
+	Path      string
+	pathRegex *regexp.Regexp
+	Vcs       string
+	Uri       string
 }
 
 type templateVars struct {
@@ -83,17 +84,28 @@ func handleGoPkg(configs []Config, host string, path string) (templateVars, erro
 	return templateVars{}, errors.New("no matching config")
 }
 
+// expandRegex replaces the variables in tmpl with matches from the regex expression in src.
+//
+// Example: r=asdf/([a-z]+)/asdf, tmpl=$1, src=asdf/this/asdf would return 'this' unquoated.
+func expandRegex(r *regexp.Regexp, tmpl string, src string) string {
+	var res []byte
+	for _, submatches := range r.FindAllStringSubmatchIndex(src, -1) {
+		res = r.ExpandString(res, tmpl, src, submatches)
+	}
+	return string(res)
+}
+
 func (c Config) constructTemplateVariables(host string, path string) (templateVars, error) {
-	rExp, err := regexp.Compile(c.Path)
-	if err != nil || !rExp.MatchString(path) {
+	if !c.pathRegex.MatchString(path) {
 		return templateVars{}, errors.New("no regex match")
 	}
 
-	uri := rExp.ReplaceAllString(path, c.Uri)
+	uri := expandRegex(c.pathRegex, c.Uri, path)
+	modPath := expandRegex(c.pathRegex, c.Path, path)
 
 	return templateVars{
 		Host: host,
-		Path: path,
+		Path: modPath,
 		Vcs:  c.Vcs,
 		Uri:  uri,
 	}, nil
@@ -112,6 +124,8 @@ func setup(c *caddy.Controller) error {
 	})
 	return nil
 }
+
+var pathReplaceRegex = regexp.MustCompile(`(\$\d)`)
 
 func parse(c *caddy.Controller) ([]Config, error) {
 	var configs []Config
@@ -135,6 +149,13 @@ func parse(c *caddy.Controller) ([]Config, error) {
 			cfg.Vcs = args[1]
 			cfg.Uri = args[2]
 		}
+
+		path := pathReplaceRegex.ReplaceAllString(cfg.Path, `([\w-_]+)`)
+		pathRegex, err := regexp.Compile(path)
+		if err != nil {
+			return configs, err
+		}
+		cfg.pathRegex = pathRegex
 
 		configs = append(configs, cfg)
 	}
