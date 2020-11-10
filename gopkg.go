@@ -89,7 +89,7 @@ func handleGoPkg(configs []Config, host string, path string) (templateVars, erro
 // Example: r=asdf/([a-z]+)/asdf, tmpl=$1, src=asdf/this/asdf would return 'this' unquoated.
 func expandRegex(r *regexp.Regexp, tmpl string, src string) string {
 	var res []byte
-	for _, submatches := range r.FindAllStringSubmatchIndex(src, -1) {
+	for _, submatches := range r.FindAllStringSubmatchIndex(src, 1) {
 		res = r.ExpandString(res, tmpl, src, submatches)
 	}
 	return string(res)

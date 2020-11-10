@@ -137,25 +137,25 @@ func TestGopkgConfig(t *testing.T) {
 		},
 		// Subpackages get the modules url
 		{
-			`gopkg /github/$1/$2 https://github.com/$1/$2`,
+			`gopkg /$1/$2 https://gitlab.com/organization/$1/$2`,
 			false,
 			[]Config{
 				{
-					Path: `/github/$1/$2`,
+					Path: `/$1/$2`,
 					Vcs:  "git",
-					Uri:  `https://github.com/$1/$2`,
+					Uri:  `https://gitlab.com/organization/$1/$2`,
 				},
 			},
 			[]io{
 				{
 					"example.com",
-					"/github/xxx/yyy/zzz",
+					"/xxx/yyy/zzz/aaa/bbb/ccc",
 					false,
 					templateVars{
 						Host: "example.com",
-						Path: "/github/xxx/yyy",
+						Path: "/xxx/yyy",
 						Vcs:  "git",
-						Uri:  "https://github.com/xxx/yyy",
+						Uri:  "https://gitlab.com/organization/xxx/yyy",
 					},
 				},
 			},
